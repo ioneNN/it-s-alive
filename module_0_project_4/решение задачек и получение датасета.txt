@@ -1,0 +1,332 @@
+4.1.
+select a.city, count(a.airport_code)
+from dst_project.airports as a
+group by city
+having count(a.airport_code) > 1;
+
+4.2.1.
+select count(f.distinct status)
+from dst_project.flights as f;
+
+4.2.2.
+select count(f.flight_id)
+from dst_project.flights as f
+where status = 'Departed';
+
+4.2.3.
+select count(s.seat_no)
+from dst_project.seats as s
+where s.aircraft_code = '773';
+
+4.2.4.
+select count(f.flight_id)
+from dst_project.flights as f
+where (f.status = 'Arrived') 
+and (f.actual_arrival between '2017-04-01' and '2017-09-01');
+
+4.3.1.
+select count(f.status)
+from dst_project.flights as f
+where status = 'Cancelled';
+
+4.3.2.
+select 
+count(distinct case when a.model like '%Boeing%' then a.model end) Boeing_amount,
+count(distinct case when a.model like '%Sukhoi Superjet%' then a.model end) Sukhoi_Superjet_amount,
+count(distinct case when a.model like '%Airbus%' then a.model end) Airbus_amount
+from dst_project.aircrafts as a;
+
+4.3.3.
+select
+count(case when a.timezone like '%Europe%' then a.timezone end) Europe_amount,
+count(case when a.timezone like '%Asia%' then a.timezone end) Asia_amount
+from dst_project.airports as a;
+
+4.3.4.
+select 
+f.flight_id
+from dst_project.flights as f 
+where f.actual_arrival is not null
+order by (f.actual_arrival - f.scheduled_arrival) desc
+limit 1;
+
+4.4.1.
+select 
+min(f.scheduled_departure)
+from dst_project.flights as f; 
+
+4.4.2.
+select
+extract(hour from ff.flight_time) * 60 + extract(minute from ff.flight_time)
+from
+(select
+(f.scheduled_arrival - f.scheduled_departure) flight_time
+from dst_project.flights as f) as ff
+order by 1 desc
+limit 1;
+
+4.4.3.
+select
+ff.departure_airport, 
+ff.arrival_airport
+from
+(select
+f.departure_airport,
+f.arrival_airport,
+(f.scheduled_arrival - f.scheduled_departure) as flight_time
+from dst_project.flights as f) as ff
+order by ff.flight_time desc
+limit 1;
+
+хотя проще, конечно, оставить как в задачке 4.3.4:
+select
+f.departure_airport, 
+f.arrival_airport
+from dst_project.flights as f
+order by (f.scheduled_arrival - f.scheduled_departure) desc
+limit 1;
+
+4.4.4.
+select
+extract(hour from ff.average_flight_time) * 60 + extract(minute from ff.average_flight_time)
+from
+(select
+avg(f.actual_arrival - f.actual_departure) as average_flight_time
+from dst_project.flights as f
+where (f.actual_arrival is not null) and (f.actual_departure is not null)) as ff;
+
+опять можно обойтись без подзапроса, запихнув avg непосредственно в extract, но оставим это любителям длинных строчек
+
+4.5.1.
+сначала адекватный вариант:
+select
+s.fare_conditions
+from dst_project.seats as s
+where s.aircraft_code = 'SU9'
+group by s.fare_conditions
+order by count(*) desc
+limit 1;
+
+а теперь добавим немножко приключений:
+select
+ff.flight_condition
+from
+(select
+'Economy' as flight_condition,
+count(s.fare_conditions) as condition_count
+from
+dst_project.seats as s
+where (s.fare_conditions = 'Economy') 
+and (s.aircraft_code = 'SU9')
+group by s.aircraft_code
+union
+select
+'Business' as flight_condition,
+count(s.fare_conditions) as condition_count
+from
+dst_project.seats as s
+where (s.aircraft_code = 'SU9')
+and (s.fare_conditions = 'Business')
+group by s.aircraft_code
+union
+select
+'Standart' as flight_condition,
+count(s.fare_conditions) as condition_count
+from
+dst_project.seats as s
+where (s.aircraft_code = 'SU9')
+and (s.fare_conditions = 'Standart')
+group by s.aircraft_code
+union
+select
+'Comfort' as flight_condition,
+count(s.fare_conditions) as condition_count
+from
+dst_project.seats as s
+where (s.aircraft_code = 'SU9')
+and (s.fare_conditions = 'Comfort')
+group by s.aircraft_code) as ff
+order by ff.condition_count desc
+limit 1;
+
+через оконную функцию текст будет покороче, но вывод будет больше:
+select
+count(case when (s.aircraft_code = 'SU9') 
+and (s.fare_conditions = 'Economy') then s.fare_conditions end) as Economy_num,
+count(case when (s.aircraft_code = 'SU9') 
+and (s.fare_conditions = 'Business') then s.fare_conditions end) as Business_num,
+count(case when (s.aircraft_code = 'SU9') 
+and (s.fare_conditions = 'Standart') then s.fare_conditions end) as Standart_num,
+count(case when (s.aircraft_code = 'SU9') 
+and (s.fare_conditions = 'Comfort') then s.fare_conditions end) as Comfort_num
+from
+dst_project.seats as s;
+
+4.5.2.
+select
+min(b.total_amount)
+from dst_project.bookings as b;
+
+Так и хочется спросить: "А в чём подвох?"
+
+4.5.3.
+select
+b.seat_no
+from
+dst_project.tickets as t
+join dst_project.boarding_passes as b
+on t.ticket_no = b.ticket_no
+where t.passenger_id = '4313 788533';
+
+5.1.1.
+select 
+count(f.flight_id)
+from 
+dst_project.airports as a
+join dst_project.flights as f
+on a.airport_code = f.arrival_airport
+where (a.city = 'Anapa') 
+and (extract(year from f.actual_arrival) = '2017');
+
+5.1.2.
+select 
+count(f.flight_id)
+from dst_project.airports as a
+join dst_project.flights as f
+on a.airport_code = f.departure_airport
+where (a.city = 'Anapa') 
+and (date_trunc('month', f.actual_departure) in ('2017-01-01', '2017-02-01', '2017-12-01'));
+
+5.1.3.
+select 
+count(f.flight_id)
+from 
+dst_project.airports as a
+join dst_project.flights as f
+on a.airport_code = f.departure_airport
+where (a.city = 'Anapa') 
+and (f.status = 'Cancelled');
+
+5.1.4.
+select 
+count(one.flight_id)
+from 
+(dst_project.airports as a
+join dst_project.flights as f
+on a.airport_code = f.departure_airport) as one
+left join
+(dst_project.airports as a
+join dst_project.flights as f
+on a.airport_code = f.arrival_airport) as two
+on one.flight_id = two.flight_id 
+and two.city = 'Moscow'
+where (two.flight_id is null) 
+and (one.city = 'Anapa'); 
+
+5.1.5.
+with one as
+(select
+ac.aircraft_code,
+ac.model,
+count(s.seat_no) as seat_amount
+from dst_project.aircrafts as ac
+join dst_project.seats as s
+on ac.aircraft_code = s.aircraft_code
+group by 2, 1),
+two as
+(select 
+f.aircraft_code
+from dst_project.airports as ap
+join dst_project.flights as f
+on ap.airport_code = f.departure_airport
+where ap.city = 'Anapa')
+select
+one.model
+from one
+join two
+on one.aircraft_code = two.aircraft_code
+order by one.seat_amount desc
+limit 1;
+
+код для получения датасета:
+
+select 
+departure_airport_flights.flight_id,
+departure_airport_flights.departure_city,
+departure_airport_flights.departure_longitude,
+departure_airport_flights.departure_latitude,
+arrival_airport_flights.arrival_city,
+arrival_airport_flights.arrival_longitude,
+arrival_airport_flights.arrival_latitude,
+departure_airport_flights.flight_day_name,
+aircrafts_seats.model,
+aircrafts_seats.range,
+aircrafts_seats.number_of_seats,
+aircrafts_seats.Economy_number,
+aircrafts_seats.Business_number,
+flight_ticket.number_of_tickets,
+flight_ticket.Economy_ticket_number,
+flight_ticket.Business_ticket_number,
+flight_ticket.flight_amount,
+flight_ticket.Economy_amount,
+flight_ticket.Business_amount
+from
+(select 
+f.flight_id,
+f.aircraft_code,
+ap.city as departure_city,
+(case 
+when extract(isodow from f.scheduled_departure) = 1 then 'Monday' 
+when extract(isodow from f.scheduled_departure) = 2 then 'Tuesday'
+when extract(isodow from f.scheduled_departure) = 3 then 'Wednesday'
+when extract(isodow from f.scheduled_departure) = 4 then 'Thursday'
+when extract(isodow from f.scheduled_departure) = 5 then 'Friday'
+when extract(isodow from f.scheduled_departure) = 6 then 'Saturday'
+else 'Sunday' end) as flight_day_name,
+ap.longitude as departure_longitude,
+ap.latitude as departure_latitude
+from 
+dst_project.airports as ap
+join dst_project.flights as f
+on ap.airport_code = f.departure_airport
+where ap.city = 'Anapa'
+AND (date_trunc('month', f.scheduled_departure) in ('2017-01-01','2017-02-01', '2017-12-01'))
+AND f.status not in ('Cancelled')) as departure_airport_flights
+join
+(select 
+f.flight_id,
+f.aircraft_code,
+ap.city as arrival_city,
+ap.longitude as arrival_longitude,
+ap.latitude as arrival_latitude
+from
+dst_project.airports as ap
+join dst_project.flights as f
+on ap.airport_code = f.arrival_airport) as arrival_airport_flights
+on departure_airport_flights.flight_id = arrival_airport_flights.flight_id
+join
+(select 
+ac.aircraft_code,
+ac.model,
+ac.range,
+count(s.seat_no) as number_of_seats,
+count(case when s.fare_conditions = 'Economy' then s.fare_conditions end) as Economy_number,
+count(case when s.fare_conditions = 'Business' then s.fare_conditions end) as Business_number
+from dst_project.aircrafts as ac
+join dst_project.seats as s
+on ac.aircraft_code = s.aircraft_code
+group by 1, 2, 3) as aircrafts_seats
+on departure_airport_flights.aircraft_code = aircrafts_seats.aircraft_code
+join
+(select 
+t.flight_id,
+count(t.ticket_no) as number_of_tickets,
+count(case when t.fare_conditions = 'Economy' then t.fare_conditions end) as Economy_ticket_number,
+count(case when t.fare_conditions = 'Business' then t.fare_conditions end) as Business_ticket_number,
+sum(t.amount) as flight_amount,
+sum(case when t.fare_conditions = 'Economy' then t.amount end) as Economy_amount,
+sum(case when t.fare_conditions = 'Business' then t.amount end) as Business_amount
+from dst_project.ticket_flights as t
+group by 1) as flight_ticket
+on departure_airport_flights.flight_id = flight_ticket.flight_id;
+
